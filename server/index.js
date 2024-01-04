@@ -8,6 +8,7 @@ const wss = new WebSocket.Server({ server });
 
 gameState = { players: {} };
 mice = {};
+players = {};
 
 function broadcast(outgoing) {
   wss.clients.forEach((client) => {
@@ -37,23 +38,28 @@ wss.on("connection", (ws) => {
           connection: ws,
           lastMsg: +Date.now(),
         };
+        players[player_id] = {
+          color: msg.color,
+          mousePos: { x: 0, y: 0 },
+          lastMsg: +Date.now(),
+        };
         single(ws, { action: "init", gameState: gameState, player_id });
         break;
       // case "change_name":
       //   gameState.players[msg.id] =
       case "mousePos":
-        if (!gameState.players[msg.player_id]) {
+        if (!players[msg.player_id]) {
           return;
         }
-        mice[msg.player_id] = msg.mousePos;
-        gameState.players[msg.player_id].lastMsg = +Date.now();
+        players[msg.player_id].mousePos = msg.mousePos;
+        players[msg.player_id].lastMsg = +Date.now();
         break;
     }
   });
 });
 
 setInterval(() => {
-  broadcast({ action: "mice", mice });
+  broadcast({ action: "players", players });
 }, 300);
 
 const PORT = 8000;

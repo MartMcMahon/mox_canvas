@@ -92,3 +92,23 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+.mainCol {
+  display: flex;
+  flex-direction: column;
+}
+.mainRow {
+  display: flex;
+  flex-direction: row;
+}
+
+#left_ui {
+  display: flex;
+  flex-direction: column;
+  margin: "24px";
+}
+
+#hand {
+  display: flex;
+  flex-direction: row;
+}
