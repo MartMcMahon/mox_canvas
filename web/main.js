@@ -38,19 +38,55 @@ class Card {
   toString() {
     return this.name;
   }
+  mouseIsOver(mousePos) {
+    if (this.isTapped) {
+      return (
+        mousePos.x > this.x &&
+        mousePos.x < this.x + Card.height * scale &&
+        mousePos.y > this.y &&
+        mousePos.y < this.y + Card.width * scale
+      );
+    } else {
+      return (
+        mousePos.x > this.x &&
+        mousePos.x < this.x + Card.width * scale &&
+        mousePos.y > this.y &&
+        mousePos.y < this.y + Card.height * scale
+      );
+    }
+  }
 
   render(ctx) {
-    ctx.drawImage(
-      this.img,
-      0,
-      0,
-      488,
-      680,
-      this.x,
-      this.y,
-      Card.width * scale,
-      Card.height * scale
-    );
+    if (this.isTapped) {
+      ctx.save();
+      ctx.translate(this.x, this.y + Card.width * scale);
+      ctx.rotate(-Math.PI / 2);
+      ctx.drawImage(
+        this.img,
+        0,
+        0,
+        488,
+        680,
+        0,
+        0,
+        Card.width * scale,
+        Card.height * scale
+      );
+      ctx.rotate(Math.PI / 2);
+      ctx.restore();
+    } else {
+      ctx.drawImage(
+        this.img,
+        0,
+        0,
+        488,
+        680,
+        this.x,
+        this.y,
+        Card.width * scale,
+        Card.height * scale
+      );
+    }
   }
 }
 
@@ -125,8 +161,6 @@ draw_button.addEventListener("click", (e) => {
   let card = deck.cards.pop();
   hand.cards.push(card);
   card.fetch().then((data) => {
-    // card.img = new Image();
-    // card.img.src = data.image_uris.normal;
     hand.render();
   });
 });
@@ -223,9 +257,41 @@ function drawTime(ctx) {
   ctx.restore();
 }
 
-window.addEventListener("mousemove", (e) => {
+const cursor = {
+  dragging: false,
+  card: null,
+};
+canvas.addEventListener("mousemove", (e) => {
   mousePos.x = e.x;
   mousePos.y = e.y;
+  if (cursor.dragging) {
+    cursor.card.x = mousePos.x - (Card.width * scale) / 2;
+    cursor.card.y = mousePos.y - (Card.height * scale) / 2;
+  } else {
+    selected_div.innerHTML = "";
+    cursor.card = null;
+    battlefield.forEach((card) => {
+      if (card.mouseIsOver(mousePos)) {
+        cursor.card = card;
+        selected_div.append(card.img);
+      }
+    });
+  }
+});
+window.addEventListener("mousedown", (e) => {
+  // check for battlefield cards
+  battlefield.forEach((card) => {
+    if (card.mouseIsOver(mousePos)) {
+      cursor.dragging = true;
+      cursor.card = card;
+      selected_div.innerHTML = "";
+      selected_div.append(card.img);
+    }
+  });
+});
+window.addEventListener("mouseup", (e) => {
+  cursor.dragging = false;
+  cursor.card = null;
 });
 
 window.setInterval(() => {
@@ -239,3 +305,11 @@ window.setInterval(() => {
     );
   }
 }, 100);
+
+window.addEventListener("keypress", (e) => {
+  if (cursor.card) {
+    if (e.key === "t") {
+      cursor.card.isTapped = !cursor.card.isTapped;
+    }
+  }
+});
