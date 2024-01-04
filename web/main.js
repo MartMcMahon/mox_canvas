@@ -6,7 +6,6 @@ let colors = ["red", "green", "blue", "yellow", "orange", "purple"];
 let appState = "loading";
 let player_id = "";
 let gameState = {};
-let mice = {};
 let players = {};
 let deck = [];
 let hand;
@@ -14,6 +13,8 @@ let battlefield = [];
 
 let selected_div = document.querySelector("#selected");
 let hand_div = document.querySelector("#hand");
+
+const scale = 2.2;
 
 class Card {
   static width = 63;
@@ -24,21 +25,14 @@ class Card {
     this.x = 0;
     this.y = 0;
   }
-  async img() {
-    if (!this.api_data) {
-      return this.fetch().then((_) => {
-        return this.api_data.image_uris.small;
-      });
-    } else {
-      return this.api_data.image_uris.small;
-    }
-  }
   async fetch() {
     console.log("calling fetch for " + this.name);
     return fetch(
       `https://api.scryfall.com/cards/named?fuzzy=${this.name}`
     ).then((res) => {
-      this.api_data = res.json();
+      const data = res.json();
+      this.api_data = data;
+      return data;
     });
   }
   toString() {
@@ -46,17 +40,17 @@ class Card {
   }
 
   render(ctx) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.fillStyle = "white";
-    ctx.fillRect(this.x, this.y, this.width, this.height);
-    ctx.closePath();
-    ctx.beginPath();
-    ctx.fillStyle = "black";
-    ctx.font = "14px Verdana";
-    ctx.fillText(this.name, this.x + 10, this.y + 20);
-    ctx.closePath();
-    ctx.restore();
+    ctx.drawImage(
+      this.img,
+      0,
+      0,
+      488,
+      680,
+      this.x,
+      this.y,
+      Card.width * scale,
+      Card.height * scale
+    );
   }
 }
 
@@ -85,7 +79,6 @@ class Hand {
     for (let i = this.cards.length - 1; i >= 0; i--) {
       let card = this.cards[i];
       let card_div = document.createElement("div");
-      card_div.appendChild(document.createElement("img"));
       card_div.style.border = "1px solid black";
       let play_button = document.createElement("button");
       play_button.innerHTML = "↑";
@@ -100,7 +93,10 @@ class Hand {
       hand_div.append(card_div, play_button);
 
       card.api_data.then((data) => {
-        card_div.firstChild.src = data.image_uris.small;
+        card.img = new Image();
+        card.img.src = data.image_uris.normal;
+        card.img.width = 200;
+        card_div.appendChild(card.img);
         card_div.addEventListener("click", (e) => {
           console.log(card);
           selected_div.innerHTML =
@@ -128,7 +124,9 @@ let draw_button = document.querySelector("#draw_button");
 draw_button.addEventListener("click", (e) => {
   let card = deck.cards.pop();
   hand.cards.push(card);
-  card.fetch().then((_) => {
+  card.fetch().then((data) => {
+    // card.img = new Image();
+    // card.img.src = data.image_uris.normal;
     hand.render();
   });
 });
@@ -147,9 +145,6 @@ ws.onmessage = (e) => {
       break;
     case "players":
       players = msg.players;
-      // Object.entries(msg.players).forEach(([id, player]) => {
-      //   mice[id] = { mousePos: { x: 0, y: 0 }, color: player.color };
-      // });
       break;
   }
 };
