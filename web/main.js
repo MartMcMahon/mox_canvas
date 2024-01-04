@@ -2,72 +2,129 @@ import "./style.css";
 
 let colors = ["red", "green", "blue", "yellow", "orange", "purple"];
 
+// game globals
+let appState = "loading";
+let player_id = "";
+let gameState = {};
+let mice = {};
+let players = {};
+let deck = [];
+let hand;
+let battlefield = [];
+let cache = {};
+
+let selected_div = document.querySelector("#selected");
+let hand_div = document.querySelector("#hand");
+
+class Card {
+  static width = 63;
+  static height = 88;
+
+  constructor(name) {
+    this.name = name;
+    this.x = 0;
+    this.y = 0;
+  }
+  async img() {
+    console.log(this.api_data);
+    if (Object.keys(cache).includes(this.name)) {
+      return cache[this.name];
+    } else {
+      this.fetch();
+    }
+  }
+  async fetch() {
+    return fetch(
+      `https://api.scryfall.com/cards/named?fuzzy=${this.name}`
+    ).then((res) => {
+      cache[this.name] = res.json();
+      console.log(`writing ${this.name} to cache`);
+      return this.api_data;
+    });
+  }
+  toString() {
+    return this.name;
+  }
+
+  render(ctx) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.fillStyle = "white";
+    ctx.fillRect(this.x, this.y, this.width, this.height);
+    ctx.closePath();
+    ctx.beginPath();
+    ctx.fillStyle = "black";
+    ctx.font = "14px Verdana";
+    ctx.fillText(this.name, this.x + 10, this.y + 20);
+    ctx.closePath();
+    ctx.restore();
+  }
+}
+
+class Deck {
+  from_moxfield_list(list) {
+    let cards = [];
+    let re = /(?<count>\d+) (?<name>.+) \((?<set_code>.+)\) (?<id>.+)/g;
+    let matches = re.exec(list);
+    while (matches) {
+      cards.push(new Card(matches[2]));
+      matches = re.exec(list);
+    }
+    let deck = new Deck();
+    deck.cards = cards;
+    return deck;
+  }
+}
+
+class Hand {
+  constructor() {
+    this.cards = [];
+  }
+  render() {
+    hand_div.innerHTML = "";
+    this.cards.forEach((card) => {
+      let card_div = document.createElement("div");
+      card_div.innerHTML = card;
+      card_div.style.border = "1px solid black";
+      card_div.addEventListener("click", (e) => {
+        console.log(card);
+        selected_div.innerHTML = card;
+      });
+      let play_button = document.createElement("button");
+      play_button.innerHTML = "↑";
+      play_button.addEventListener("click", async (e) => {
+        let c = new Card(card);
+        let i = c.img();
+        c.fetch().then(() => {
+          i = c.img();
+        });
+        console.log(i);
+        c.x = battlefield.length * 10;
+        c.y = battlefield.length * 10;
+        battlefield.push(card);
+      });
+      hand_div.prepend(card_div, play_button);
+    });
+  }
+}
+hand = new Hand();
+
 let canvas = document.createElement("canvas");
 canvas.width = window.innerWidth - 200;
 canvas.height = window.innerHeight - 200;
 document.querySelector("#app").appendChild(canvas);
 let ctx = canvas.getContext("2d");
 
-// let left_ui = document.querySelector("#left_ui");
-// left_ui.style.margin = "24px";
-// let name_label = document.createElement("label");
-// name_label.innerHTML = "name: ";
-// let name_input = document.createElement("input");
-// name_input.setAttribute("type", "text");
-// let name_submit = document.createElement("button");
-// name_submit.innerHTML = "submit";
-// // let name_div = document.createElement("div");
-// // name_div.style.display = "flex";
-// // name_div.style.flexDirection = "row";
-// left_ui.appendChild(name_label);
-// left_ui.appendChild(name_input);
-// left_ui.appendChild(name_submit);
-// name_submit.addEventListener("click", (e) => {
-//   if (ws.readyState === 1) {
-//     ws.send(
-//       JSON.stringify({
-//         action: "change_name",
-//         id: name_input.value,
-//       })
-//     );
-//   }
-// });
-
 let deck_input = document.querySelector("#deck_input");
 let deck_submit = document.querySelector("#deck_submit");
-
-let hand_div = document.querySelector("#hand");
-let draw_button = document.querySelector("#draw_button");
-draw_button.addEventListener("click", (e) => {
-  console.log("draw");
-  hand.push(deck.pop());
-  hand_div.innerHTML = "";
-  hand.forEach((card) => {
-    console.log(card);
-    let card_div = document.createElement("div");
-    card_div.innerHTML = card;
-    card_div.style.border = "1px solid black";
-    card_div.addEventListener("click", (e) => {
-      console.log(card);
-      selected_div.innerHTML = card;
-    });
-    let play_button = document.createElement("button");
-    play_button.innerHTML = "↑";
-    hand_div.prepend(card_div, play_button);
-  });
+deck_submit.addEventListener("click", (e) => {
+  deck = new Deck().from_moxfield_list(deck_input.value);
 });
 
-let selected_div = document.querySelector("#selected");
-
-let appState = "loading";
-let player_id = "";
-let gameState = {};
-let mice = {};
-let deck = [];
-let hand = [];
-
-deck_submit.addEventListener("click", (e) => {
-  deck = deck_input.value.split("\n");
+let draw_button = document.querySelector("#draw_button");
+draw_button.addEventListener("click", (e) => {
+  hand.cards.push(deck.cards.pop());
+  hand.render();
 });
 
 ////// connection
@@ -83,9 +140,10 @@ ws.onmessage = (e) => {
       console.log(player_id);
       break;
     case "players":
-      Object.entries(msg.players).forEach(([id, player]) => {
-        mice[id] = player.mousePos;
-      });
+      players = msg.players;
+      // Object.entries(msg.players).forEach(([id, player]) => {
+      //   mice[id] = { mousePos: { x: 0, y: 0 }, color: player.color };
+      // });
       break;
   }
 };
@@ -123,17 +181,25 @@ function update(secondsPassed) {
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawBattlefield(ctx);
   drawTime(ctx);
   drawMice(ctx);
 }
 
+function drawBattlefield(ctx) {
+  ctx.save();
+  battlefield.forEach((card) => {
+    card.render(ctx);
+  });
+  ctx.restore();
+}
+
 function drawMice(ctx) {
-  Object.entries(mice).forEach(([id, mouse]) => {
-    let color = gameState.players[id].color;
+  Object.entries(players).forEach(([id, player]) => {
     ctx.save();
     ctx.beginPath();
-    ctx.arc(mouse.x, mouse.y, 3, 0, 2 * Math.PI, false);
-    ctx.fillStyle = color;
+    ctx.arc(player.mousePos.x, player.mousePos.y, 3, 0, 2 * Math.PI, false);
+    ctx.fillStyle = player.color;
     ctx.fill();
     ctx.closePath();
     ctx.restore();
