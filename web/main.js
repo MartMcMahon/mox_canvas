@@ -11,7 +11,6 @@ let players = {};
 let deck = [];
 let hand;
 let battlefield = [];
-let cache = {};
 
 let selected_div = document.querySelector("#selected");
 let hand_div = document.querySelector("#hand");
@@ -26,20 +25,20 @@ class Card {
     this.y = 0;
   }
   async img() {
-    console.log(this.api_data);
-    if (Object.keys(cache).includes(this.name)) {
-      return cache[this.name];
+    if (!this.api_data) {
+      return this.fetch().then((_) => {
+        return this.api_data.image_uris.small;
+      });
     } else {
-      this.fetch();
+      return this.api_data.image_uris.small;
     }
   }
   async fetch() {
+    console.log("calling fetch for " + this.name);
     return fetch(
       `https://api.scryfall.com/cards/named?fuzzy=${this.name}`
     ).then((res) => {
-      cache[this.name] = res.json();
-      console.log(`writing ${this.name} to cache`);
-      return this.api_data;
+      this.api_data = res.json();
     });
   }
   toString() {
@@ -81,30 +80,34 @@ class Hand {
     this.cards = [];
   }
   render() {
+    console.log("rendering hand", this.cards);
     hand_div.innerHTML = "";
-    this.cards.forEach((card) => {
+    for (let i = this.cards.length - 1; i >= 0; i--) {
+      let card = this.cards[i];
       let card_div = document.createElement("div");
-      card_div.innerHTML = card;
+      card_div.appendChild(document.createElement("img"));
       card_div.style.border = "1px solid black";
-      card_div.addEventListener("click", (e) => {
-        console.log(card);
-        selected_div.innerHTML = card;
-      });
       let play_button = document.createElement("button");
       play_button.innerHTML = "↑";
-      play_button.addEventListener("click", async (e) => {
-        let c = new Card(card);
-        let i = c.img();
-        c.fetch().then(() => {
-          i = c.img();
-        });
-        console.log(i);
-        c.x = battlefield.length * 10;
-        c.y = battlefield.length * 10;
+      play_button.addEventListener("click", (_) => {
+        card.x = battlefield.length * Card.width;
+        card.y = battlefield.length * Card.height;
+        console.log("moving " + card.name + " to the battlefield");
         battlefield.push(card);
+        this.cards.splice(i, 1);
+        this.render();
       });
-      hand_div.prepend(card_div, play_button);
-    });
+      hand_div.append(card_div, play_button);
+
+      card.api_data.then((data) => {
+        card_div.firstChild.src = data.image_uris.small;
+        card_div.addEventListener("click", (e) => {
+          console.log(card);
+          selected_div.innerHTML =
+            "<img src='" + data.image_uris.normal + "' width='300px'></img>";
+        });
+      });
+    }
   }
 }
 hand = new Hand();
@@ -123,8 +126,11 @@ deck_submit.addEventListener("click", (e) => {
 
 let draw_button = document.querySelector("#draw_button");
 draw_button.addEventListener("click", (e) => {
-  hand.cards.push(deck.cards.pop());
-  hand.render();
+  let card = deck.cards.pop();
+  hand.cards.push(card);
+  card.fetch().then((_) => {
+    hand.render();
+  });
 });
 
 ////// connection
