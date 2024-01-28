@@ -14,7 +14,7 @@ let battlefield = [];
 let selected_div = document.querySelector("#selected");
 let hand_div = document.querySelector("#hand");
 
-const scale = 2.2;
+const scale = 1.8;
 
 class Card {
   static width = 63;
@@ -119,10 +119,10 @@ class Hand {
       let play_button = document.createElement("button");
       play_button.innerHTML = "↑";
       play_button.addEventListener("click", (_) => {
-        card.x = battlefield.length * Card.width;
-        card.y = battlefield.length * Card.height;
+        card.x = Card.width;
+        card.y = Card.height;
         console.log("moving " + card.name + " to the battlefield");
-        battlefield.push(card);
+        pushToBattlefield(card);
         this.cards.splice(i, 1);
         this.render();
       });
@@ -146,7 +146,7 @@ hand = new Hand();
 
 let canvas = document.createElement("canvas");
 canvas.width = window.innerWidth - 200;
-canvas.height = window.innerHeight - 200;
+canvas.height = window.innerHeight;
 document.querySelector("#app").appendChild(canvas);
 let ctx = canvas.getContext("2d");
 
@@ -180,6 +180,10 @@ ws.onmessage = (e) => {
     case "players":
       players = msg.players;
       break;
+    case "moveToBattlefield":
+      battlefield.push(msg.card);
+      break;
+
   }
 };
 ws.onopen = (e) => {
@@ -191,6 +195,7 @@ ws.onopen = (e) => {
     })
   );
 };
+
 
 let secondsPassed = 0;
 let oldTimeStamp = 0;
@@ -230,6 +235,7 @@ function drawBattlefield(ctx) {
 }
 
 function drawMice(ctx) {
+  ctx.translate(0, 0);
   Object.entries(players).forEach(([id, player]) => {
     ctx.save();
     ctx.beginPath();
@@ -313,3 +319,14 @@ window.addEventListener("keypress", (e) => {
     }
   }
 });
+
+function pushToBattlefield(card) {
+  console.log("moving " + card.name + " to the battlefield");
+  battlefield.push(card);
+  ws.send(
+    JSON.stringify({
+      action: "moveToBattlefield",
+      card,
+    })
+  );
+}
